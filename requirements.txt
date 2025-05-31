@@ -7,3 +7,5 @@ langchain-groq
 langchain-community
 protobuf
 langchain-huggingface
+faiss-cpu
+faiss-gpu
