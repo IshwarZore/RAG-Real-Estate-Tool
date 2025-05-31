@@ -1,5 +1,3 @@
-# @Author: Dhaval Patel Copyrights Codebasics Inc. and LearnerX Pvt Ltd.
-
 import streamlit as st
 from rag import process_urls, generate_answer
 
