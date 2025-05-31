@@ -6,14 +6,14 @@ from pathlib import Path
 from langchain.chains import RetrievalQAWithSourcesChain
 from langchain_community.document_loaders import UnstructuredURLLoader
 from langchain.text_splitter import RecursiveCharacterTextSplitter
-from langchain.vectorstores import FAISS
+from langchain_community.vectorstores import FAISS
 from langchain_groq import ChatGroq
 from langchain_huggingface.embeddings import HuggingFaceEmbeddings
 
 load_dotenv()
 
 # Constants
-CHUNK_SIZE = 1000
+CHUNK_SIZE = 300  # or even 300
 EMBEDDING_MODEL = "sentence-transformers/all-MiniLM-L6-v2"
 VECTORSTORE_DIR = Path(__file__).parent / "resources/vectorstore"
 COLLECTION_NAME = "real_estate"
@@ -26,7 +26,7 @@ def initialize_components():
     global llm, vector_store
 
     if llm is None:
-        llm = ChatGroq(model="llama-3.3-70b-versatile", temperature=0.9, max_tokens=500)
+        llm = ChatGroq(model="llama-3.3-70b-versatile", temperature=0.7, max_tokens=300, top_p=0.9)
 
     # if vector_store is None:
     #     ef = HuggingFaceEmbeddings(
@@ -59,9 +59,11 @@ def process_urls(urls):
 
     yield "Splitting text into chunks...✅"
     text_splitter = RecursiveCharacterTextSplitter(
-        separators=["\n\n", "\n", ".", " "],
-        chunk_size=CHUNK_SIZE
+    separators=["\n\n", "\n", ".", " "],
+    chunk_size=CHUNK_SIZE,
+    chunk_overlap=50  # You can also try 100 if needed
     )
+
     docs = text_splitter.split_documents(data)
 
     yield "Creating vector store from documents...✅"
@@ -83,7 +85,17 @@ def generate_answer(query):
     if not vector_store:
         raise RuntimeError("Vector database is not initialized ")
 
-    chain = RetrievalQAWithSourcesChain.from_llm(llm=llm, retriever=vector_store.as_retriever())
+    retriever = vector_store.as_retriever(search_kwargs={"k": 4})
+    docs = retriever.get_relevant_documents(query)
+    print("\n--- Retrieved Documents ---")
+    for i, doc in enumerate(docs, 1):
+        print(f"\nDoc {i}:\n{doc.page_content[:1000]}")  # truncate for readability
+
+    chain = RetrievalQAWithSourcesChain.from_chain_type(
+    llm=llm,
+    retriever=retriever,
+    chain_type="stuff"  # You can later test "map_reduce" or "refine" too
+    )
     result = chain.invoke({"question": query}, return_only_outputs=True)
     sources = result.get("sources", "")
 
