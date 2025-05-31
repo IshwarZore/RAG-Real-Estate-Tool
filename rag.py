@@ -28,19 +28,19 @@ def initialize_components():
     if llm is None:
         llm = ChatGroq(model="llama-3.3-70b-versatile", temperature=0.9, max_tokens=500)
 
-    if vector_store is None:
-        ef = HuggingFaceEmbeddings(
-            model_name=EMBEDDING_MODEL,
-            model_kwargs={"trust_remote_code": True}
-        )
+    # if vector_store is None:
+    #     ef = HuggingFaceEmbeddings(
+    #         model_name=EMBEDDING_MODEL,
+    #         model_kwargs={"trust_remote_code": True}
+    #     )
 
-        # vector_store = Chroma(
-        #     collection_name=COLLECTION_NAME,
-        #     embedding_function=ef,
-        #     #persist_directory=str(VECTORSTORE_DIR)
-        # )
-        from langchain.docstore.in_memory import InMemoryDocstore
-        vector_store = FAISS.from_documents([], ef)
+    #     # vector_store = Chroma(
+    #     #     collection_name=COLLECTION_NAME,
+    #     #     embedding_function=ef,
+    #     #     #persist_directory=str(VECTORSTORE_DIR)
+    #     # )
+    #     from langchain.docstore.in_memory import InMemoryDocstore
+    #     vector_store = FAISS.from_documents([], ef)
 
 
 
@@ -53,12 +53,6 @@ def process_urls(urls):
     yield "Initializing Components"
     initialize_components()
 
-    yield "Resetting vector store...✅"
-    # vector_store.reset_collection()
-    global vector_store
-    vector_store = FAISS.from_documents([], vector_store.embedding_function)
-
-
     yield "Loading data...✅"
     loader = UnstructuredURLLoader(urls=urls)
     data = loader.load()
@@ -70,11 +64,20 @@ def process_urls(urls):
     )
     docs = text_splitter.split_documents(data)
 
+    yield "Creating vector store from documents...✅"
+    global vector_store
+    ef = HuggingFaceEmbeddings(
+        model_name=EMBEDDING_MODEL,
+        model_kwargs={"trust_remote_code": True}
+    )
+    vector_store = FAISS.from_documents(docs, ef)
+
     yield "Add chunks to vector database...✅"
     uuids = [str(uuid4()) for _ in range(len(docs))]
     vector_store.add_documents(docs, ids=uuids)
 
     yield "Done adding docs to vector database...✅"
+
 
 def generate_answer(query):
     if not vector_store:
@@ -93,7 +96,10 @@ if __name__ == "__main__":
         "https://www.cnbc.com/2024/12/20/why-mortgage-rates-jumped-despite-fed-interest-rate-cut.html"
     ]
 
-    process_urls(urls)
+    # Run the generator to completion and print status messages
+    for status in process_urls(urls):
+        print(status)
+
     answer, sources = generate_answer("Tell me what was the 30 year fixed mortagate rate along with the date?")
     print(f"Answer: {answer}")
     print(f"Sources: {sources}")
