@@ -6,7 +6,7 @@ from pathlib import Path
 from langchain.chains import RetrievalQAWithSourcesChain
 from langchain_community.document_loaders import UnstructuredURLLoader
 from langchain.text_splitter import RecursiveCharacterTextSplitter
-from langchain_chroma import Chroma
+from langchain.vectorstores import FAISS
 from langchain_groq import ChatGroq
 from langchain_huggingface.embeddings import HuggingFaceEmbeddings
 
@@ -34,11 +34,14 @@ def initialize_components():
             model_kwargs={"trust_remote_code": True}
         )
 
-        vector_store = Chroma(
-            collection_name=COLLECTION_NAME,
-            embedding_function=ef,
-            #persist_directory=str(VECTORSTORE_DIR)
-        )
+        # vector_store = Chroma(
+        #     collection_name=COLLECTION_NAME,
+        #     embedding_function=ef,
+        #     #persist_directory=str(VECTORSTORE_DIR)
+        # )
+        from langchain.docstore.in_memory import InMemoryDocstore
+        vector_store = FAISS.from_documents([], ef)
+
 
 
 def process_urls(urls):
@@ -51,7 +54,10 @@ def process_urls(urls):
     initialize_components()
 
     yield "Resetting vector store...✅"
-    vector_store.reset_collection()
+    # vector_store.reset_collection()
+    global vector_store
+    vector_store = FAISS.from_documents([], vector_store.embedding_function)
+
 
     yield "Loading data...✅"
     loader = UnstructuredURLLoader(urls=urls)
